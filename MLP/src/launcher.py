@@ -66,6 +66,16 @@ def process_args(args, defaults, description):
                         type=str, default=defaults.DATA_PATH,
                         help=('Data directory (default: %(default)s)'))
 
+    parser.add_argument('--load_model', dest="load_model",
+                        type=str, default=defaults.LOAD_MODEL,
+                        help=('Load Pre-trained model (True/False) (default: %(default)s)'))
+
+    parser.add_argument('--load_epoch', dest="load_epoch",
+                        type=str, default=defaults.LOAD_EPOCH,
+                        help=('Load Pre-trained model epoch number : (default: %(default)s)'))
+
+
+
     parameters = parser.parse_args(args)
 
     return parameters

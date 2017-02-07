@@ -2,12 +2,16 @@ __author__ = 'Rakesh'
 
 
 # TODO:
-# 1. Saving Model
-# 2. Dropouts
-# 3. Batch-norm
+# 1. Saving and Loading model (DONE, Rakesh)
+# 2. Dropouts (Manu)
+# 3. Batch-norm (Manu)
+# 4. Plots (Rakesh)
+
+
 import numpy as np
 import cPickle
 import gzip
+import os
 
 def create_onehot(target_class, shape1, shape2):
 	one_hot_vec = np.zeros((shape1, shape2))
@@ -274,16 +278,35 @@ class MLP():
 	def buildNetwork(self):
 
 		self.layers = []
-		if np.asarray([self.sizes]).ndim > 1:
-			self.layers.append(HiddenLayer(self.rng, self.n_in, self.sizes[0], self.args))
+		if self.args.load_model == False:
 
-			for i in xrange(self.num_hidden-1):
-				self.layers.append(HiddenLayer(self.rng, self.sizes[i], self.sizes[i+1], self.args))
+			if np.asarray([self.sizes]).ndim > 1:
+				self.layers.append(HiddenLayer(self.rng, self.n_in, self.sizes[0], self.args))
 
-			self.layers.append(FinalLayer(self.rng, self.sizes[-1], self.n_out, self.args))
+				for i in xrange(self.num_hidden-1):
+					self.layers.append(HiddenLayer(self.rng, self.sizes[i], self.sizes[i+1], self.args))
+
+				self.layers.append(FinalLayer(self.rng, self.sizes[-1], self.n_out, self.args))
+			else:
+				self.layers.append(HiddenLayer(self.rng, self.n_in, self.sizes, self.args))
+				self.layers.append(FinalLayer(self.rng, self.sizes, self.n_out, self.args))
+
 		else:
-			self.layers.append(HiddenLayer(self.rng, self.n_in, self.sizes, self.args))
-			self.layers.append(FinalLayer(self.rng, self.sizes, self.n_out, self.args))
+
+			layer1_params = np.load(self.save_dir+"epoch_%d/layer1_wb.npy"%(self.args.load_epoch))
+			if np.asarray([self.sizes]).ndim > 1:
+				self.layers.append(HiddenLayer(self.rng, self.n_in, self.sizes[0], self.args, layer1_params[0], layer1_params[1]))
+
+				for i in xrange(self.num_hidden-1):
+					layer_params = np.load(self.save_dir+"epoch_%d/layer%d_wb.npy"%(self.args.load_epoch,i+1))
+					self.layers.append(HiddenLayer(self.rng, self.sizes[i], self.sizes[i+1], self.args, layer_params[0], layer_params[1]))
+
+				layerFinal_params = np.load(self.save_dir+"epoch_%d/layer%d_wb.npy"%(self.args.load_epoch,i+1))
+				self.layers.append(FinalLayer(self.rng, self.sizes[-1], self.n_out, self.args, layerFinal_params[0], layerFinal_params[1]))
+			else:
+				self.layers.append(HiddenLayer(self.rng, self.n_in, self.sizes, self.args, layer1_params[0], layer1_params[1]))
+				layerFinal_params = np.load(self.save_dir+"epoch_%d/layer2_wb.npy"%(self.args.load_epoch))
+				self.layers.append(FinalLayer(self.rng, self.sizes, self.n_out, self.args, layerFinal_params[0], layerFinal_params[1]))
 
 
 	def train(self, train, valid, test):
@@ -302,6 +325,15 @@ class MLP():
 			n_train_batches = train_x.shape[0] // self.minibatch_size
 
 			train_loss = []
+
+			if not os.path.exists(self.args.expt_dir+"epoch_%d/"%(j)):
+				os.makedirs(self.args.expt_dir+"epoch_%d/"%(j))
+			f1_loss = open(self.args.expt_dir+"epoch_%d/log_loss_train.txt"%(j),'w')
+			f1_error = open(self.args.expt_dir+"epoch_%d/log_error_train.txt"%(j),'w')
+			f2_loss = open(self.args.expt_dir+"epoch_%d/log_loss_valid.txt"%(j),'w')
+			f2_error = open(self.args.expt_dir+"epoch_%d/log_error_valid.txt"%(j),'w')
+			f3_loss = open(self.args.expt_dir+"epoch_%d/log_loss_test.txt"%(j),'w')
+			f3_error = open(self.args.expt_dir+"epoch_%d/log_error_test.txt"%(j),'w')
 
 			for i in xrange(n_train_batches):
 
@@ -325,7 +357,7 @@ class MLP():
 				# Loss Computation
 
 				if self.loss=="ce":
-					saving_loss = np.mean(np.sum(np.multiply(y_onehot,output), axis=1), axis=0)
+					saving_loss = -np.mean(np.sum(np.multiply(y_onehot,np.log(output)), axis=1), axis=0)
 				elif self.loss=="sq":
 					saving_loss = np.mean(np.sum((y_onehot-output)**2, axis=1), axis=0)
 
@@ -337,12 +369,14 @@ class MLP():
 
 				if (i+1)%100==0:
 
-					# f = open(self.args.expt_dir+"log_loss_train.txt",'a')
-					# np.savetxt(f, "Epoch %d, Step %d, Loss: %.4f, lr: %.4f"%(j,i,saving_loss, self.layers[-1].lr))
-					# f.close()
-					# f = open(self.args.expt_dir+"log_error_train.txt",'a')
-					# np.savetxt(f, "Epoch %d, Step %d, Error: %.4f, lr: %.4f"%(j,i,np.mean(train_loss), self.layers[-1].lr))
-					# f.close()
+					f1_loss.write( "Epoch %d, Step %d, Loss: %.4f, lr: %.4f\n"%(j,(i+1),saving_loss, self.layers[0].lr))
+					f1_error.write( "Epoch %d, Step %d, Error: %.4f, lr: %.4f\n"%(j,(i+1),100*(1-np.mean(train_loss)), self.layers[0].lr))
+
+					if not os.path.exists(self.args.expt_dir+"epoch_%d/steps_%d/"%(j,(i+1))):
+						os.makedirs(self.args.expt_dir+"epoch_%d/steps_%d/"%(j,(i+1)))
+					f11_pred = open(self.args.expt_dir+"epoch_%d/steps_%d/valid_predictions.txt"%(j,(i+1)),'w')
+					f12_pred = open(self.args.expt_dir+"epoch_%d/steps_%d/test_predictions.txt"%(j,(i+1)),'w')
+
 
 					# VALIDATION
 					n_valid_minibatches = valid_x.shape[0] // self.minibatch_size
@@ -358,35 +392,22 @@ class MLP():
 							output = self.layers[ii].forward_pass(input)
 							input = output
 
-						# f = open(self.args.expt_dir+"epoch_" + j + "/steps_" + i +"/" + "valid_predictions.txt",a)
-						# np.savetxt(f,output)
-						# f.close()
-
+						np.savetxt(f11_pred,np.argmax(output,axis=1).astype(int), fmt="%i")
 						valid_score = 0
 						for ii in xrange(y.shape[0]):
 							if (y[ii]==np.argmax(output[ii,:])):
 								valid_score +=1
 						valid_loss.append(float(valid_score)/self.minibatch_size)
 
-					if np.mean(valid_loss) > best_valid_loss:
-						best_valid_loss = np.mean(valid_loss)
-					else:
-						if self.args.anneal and (prev_train_loss < np.mean(train_loss)):
-							for ii in range(len(self.layers)):
-								self.layers[ii].anneal_lr()
 						#print("TRUE")
 
 					if self.loss=="ce":
-						saving_loss = np.mean(np.sum(np.multiply(y_onehot,output), axis=1), axis=0)
+						saving_loss = -np.mean(np.sum(np.multiply(y_onehot,np.log(output)), axis=1), axis=0)
 					elif self.loss=="sq":
 						saving_loss = np.mean(np.sum((y_onehot-output)**2, axis=1), axis=0)
 
-					# f = open(self.args.expt_dir+"log_loss_valid.txt",'a')
-					# np.savetxt(f, "Epoch %d, Step %d, Loss: %.4f, lr: %.4f"%(j,i,saving_loss, self.layers[-1].lr))
-					# f.close()
-					# f = open(self.args.expt_dir+"log_error_valid.txt",'a')
-					# np.savetxt(f, "Epoch %d, Step %d, Error: %.4f, lr: %.4f"%(j,i,np.mean(valid_loss), self.layers[-1].lr))
-					# f.close()
+					f2_loss.write( "Epoch %d, Step %d, Loss: %.4f, lr: %.4f\n"%(j,(i+1),saving_loss, self.layers[-1].lr))
+					f2_error.write( "Epoch %d, Step %d, Error: %.4f, lr: %.4f\n"%(j,(i+1),100*(1-np.mean(valid_loss)), self.layers[-1].lr))
 
 
 					# TESTING
@@ -403,9 +424,7 @@ class MLP():
 							output = self.layers[ii].forward_pass(input)
 							input = output
 
-						# f = open(self.args.expt_dir+"epoch_" + j + "/steps_" + i +"/" + "test_predictions.txt",a)
-						# np.savetxt(f,output)
-						# f.close()
+						np.savetxt(f12_pred,np.argmax(output,axis=1).astype(int), fmt="%i")
 
 						test_score = 0
 						for ii in xrange(y.shape[0]):
@@ -414,24 +433,46 @@ class MLP():
 						test_loss.append(float(test_score)/self.minibatch_size)
 
 					if self.loss=="ce":
-						saving_loss = np.mean(np.sum(np.multiply(y_onehot,output), axis=1), axis=0)
+						saving_loss = -np.mean(np.sum(np.multiply(y_onehot,np.log(output)), axis=1), axis=0)
 					elif self.loss=="sq":
 						saving_loss = np.mean(np.sum((y_onehot-output)**2, axis=1), axis=0)
 
-					# f = open(self.args.expt_dir+"log_loss_test.txt",'a')
-					# np.savetxt(f, "Epoch %d, Step %d, Loss: %.4f, lr: %.4f"%(j,i,saving_loss, self.layers[-1].lr))
-					# f.close()
-					# f = open(self.args.expt_dir+"log_error_test.txt",'a')
-					# np.savetxt(f, "Epoch %d, Step %d, Error: %.4f, lr: %.4f"%(j,i,np.mean(test_loss), self.layers[-1].lr))
-					# f.close()
+
+					f3_loss.write( "Epoch %d, Step %d, Loss: %.4f, lr: %.4f\n"%(j,(i+1),saving_loss, self.layers[-1].lr))
+					f3_error.write( "Epoch %d, Step %d, Error: %.4f, lr: %.4f\n"%(j,(i+1),100*(1-np.mean(test_loss)), self.layers[-1].lr))
+
+					# print "Epoch : %d Steps : %d Train Accuracy : %.4f Validation Accuracy : %.4f Test Accuracy : %.4f LR : %.4f"%(j, i+1, 100*(np.mean(train_loss)), 100*(np.mean(valid_loss)), 100*(np.mean(test_loss)), self.layers[-1].lr)
+
+					if np.mean(valid_loss) > best_valid_loss:
+						best_valid_loss = np.mean(valid_loss)
+					else:
+						if self.args.anneal and (prev_train_loss < np.mean(train_loss)):
+							for ii in range(len(self.layers)):
+								self.layers[ii].anneal_lr()
 
 					if np.mean(test_loss) > best_test_loss:
 						best_test_loss = np.mean(test_loss)
 						best_test_steps = i
 						best_test_epoch = j
 
-					print "Epoch : %d Steps : %d Train Accuracy : %.4f Validation Accuracy : %.4f Test Accuracy : %.4f LR : %.4f"%(j, i+1, 100*(np.mean(train_loss)), 100*(np.mean(valid_loss)), 100*(np.mean(test_loss)), self.layers[-1].lr)
+					f11_pred.close()
+					f12_pred.close()
+
 				prev_train_loss = np.mean(train_loss)
+
+			f1_loss.close()
+			f1_error.close()
+			f2_loss.close()
+			f2_error.close()
+			f3_loss.close()
+			f3_error.close()
+
+			if not os.path.exists(self.args.save_dir+"epoch_%d/"%(j)):
+				os.makedirs(self.args.save_dir+"epoch_%d/"%(j))
+			for ii in xrange(len(self.layers)):
+				np.save(self.args.save_dir+"epoch_%d/layer%d_wb"%(j,ii+1), [self.layers[ii].W, self.layers[ii].b])
+
+			print "Epoch : %d completed. Model saved."%(j)
 		print "Best test accuracy on dataset : %.4f after %d epochs and %d steps of training."%(best_test_loss, best_test_epoch, best_test_steps)
 
 def loadData(args):
@@ -445,8 +486,6 @@ def loadData(args):
 	test_x, test_y 		= test_set
 
 	return train_set, valid_set, test_set
-	
-
 
 def main(rng,args):
 
@@ -460,14 +499,6 @@ def main(rng,args):
 	idx = np.arange(np.shape(train[0])[0])
 	rng.shuffle(idx)
 	train = train[0][idx], train[1][idx]
-
-	idx = np.arange(np.shape(valid[0])[0])
-	rng.shuffle(idx)
-	valid = valid[0][idx], valid[1][idx]
-
-	idx = np.arange(np.shape(test[0])[0])
-	rng.shuffle(idx)
-	test = test[0][idx], test[1][idx]
 
 	network.train(train, valid, test)
 

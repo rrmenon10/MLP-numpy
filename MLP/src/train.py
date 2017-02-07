@@ -21,5 +21,11 @@ class Defaults:
 	EXPT_DIR = '../logs/'
 	DATA_PATH = '../data/mnist.pkl.gz'
 
+	########################
+	# LOAD MODEL PARAMETERS#
+	########################
+	LOAD_MODEL = False
+	LOAD_EPOCH = MAX_EPOCH
+
 if __name__ == "__main__":
 	launcher.start(sys.argv[1:], Defaults, __doc__)
