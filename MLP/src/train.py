@@ -9,12 +9,12 @@ class Defaults:
 
 	MAX_EPOCH = 1000
 	LEARNING_RATE = 0.1
-	MOMENTUM = 0.5
+	MOMENTUM = 0.6
 	NUM_HIDDEN = 2
 	SIZES = "256, 64"
 	ACTIVATION = 'sigmoid'
 	LOSS = 'ce'
-	OPTIMIZER = 'adam'
+	OPTIMIZER = 'gd'
 	BATCH_SIZE = 20
 	ANNEAL_LR = False
 	SAVE_DIR = '../models/'

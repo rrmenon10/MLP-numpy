@@ -55,7 +55,7 @@ class FinalLayer():
 		self.momentum_b = np.zeros((n_output,))
 		self.v_w = np.zeros((n_input, n_output))
 		self.v_b = np.zeros((n_output,))
-		self.epsilon = 0.001
+		self.epsilon = 1e-8
 		self.beta1 = 0.9
 		self.beta2 = 0.999
 
@@ -78,10 +78,14 @@ class FinalLayer():
 
 	def backward_prop(self, one_hot_vec):
 
+		if self.args.optimizer == "nag":
+			self.nag()
+			self.output = self.forward_pass(self.input)
+
 		if self.args.loss == "ce":
 			gradOutput = self.grad_calc(-(one_hot_vec - self.output)) 
 		elif self.args.loss == "sq":
-			gradOutput == self.grad_calc((one_hot_vec - self.output))
+			gradOutput = self.grad_calc((one_hot_vec - self.output))
 
 		return gradOutput
 
@@ -100,7 +104,7 @@ class FinalLayer():
 		elif self.args.optimizer == "adam":
 			self.adam(grad_W, grad_b)
 		elif self.args.optimizer == "nag":
-			self.nag(grad_W,grad_b)
+			self.gd(grad_W,grad_b)
 		elif self.args.optimizer == "momentum":
 			self.momentum(grad_W, grad_b)
 
@@ -118,13 +122,15 @@ class FinalLayer():
 		self.v_w = self.beta2 * self.v_w + (1-self.beta2) * grad_W**2
 		self.v_b = self.beta2 * self.v_b + (1-self.beta2) * grad_b**2
 
-		self.delta_w = self.lr/(np.sqrt(self.v_w + self.epsilon))*self.momentum_w
-		self.delta_b = self.lr/(np.sqrt(self.v_b + self.epsilon))*self.momentum_b
+		self.delta_w = self.lr/(np.sqrt(self.v_w) + self.epsilon)*self.momentum_w
+		self.delta_b = self.lr/(np.sqrt(self.v_b) + self.epsilon)*self.momentum_b
 
 		self.update(self.delta_w, self.delta_b)
 
-	def nag(self, grad_W, grad_b):
-		raise ValueError('Not applicable yet')
+	def nag(self):
+		self.delta_w = self.args.momentum * self.delta_w
+		self.delta_b = self.args.momentum * self.delta_b
+		self.update(self.delta_w, self.delta_b)
 
 	def momentum(self, grad_W, grad_b):
 
@@ -189,6 +195,9 @@ class HiddenLayer():
 
 	def backward_prop(self,gradOutput):
 
+		if self.args.optimizer == "nag":
+			self.nag()
+			self.output = self.forward_pass(self.input)
 		grad_a = np.multiply(self.grad_act(), gradOutput)
 		grad_W = np.dot(self.input.T,grad_a)
 		grad_b = grad_a
@@ -203,16 +212,15 @@ class HiddenLayer():
 		elif self.args.optimizer == "adam":
 			self.adam(grad_W, grad_b)
 		elif self.args.optimizer == "nag":
-			self.nag(grad_W,grad_b)
+			self.gd(grad_W,grad_b)
 		elif self.args.optimizer == "momentum":
 			self.momentum(grad_W, grad_b)
-
 
 	def tanh(self, input):
 		return np.tanh(input)
 
 	def sigmoid(self, input):
-		return 1.0/(1 + np.exp(-input))
+		return 1.0/(1.0 + np.exp(-input))
 
 	def grad_tanh(self):
 		return 1.0 - self.output**2
@@ -234,13 +242,15 @@ class HiddenLayer():
 		self.v_w = self.beta2 * self.v_w + (1-self.beta2) * grad_W**2
 		self.v_b = self.beta2 * self.v_b + (1-self.beta2) * grad_b**2
 
-		self.delta_w = self.lr/(np.sqrt(self.v_w + self.epsilon))*self.momentum_w
-		self.delta_b = self.lr/(np.sqrt(self.v_b + self.epsilon))*self.momentum_b
+		self.delta_w = self.lr/(np.sqrt(self.v_w) + self.epsilon)*self.momentum_w
+		self.delta_b = self.lr/(np.sqrt(self.v_b) + self.epsilon)*self.momentum_b
 
 		self.update(self.delta_w, self.delta_b)
 
-	def nag(self, grad_W, grad_b):
-		raise ValueError('Not applicable yet')
+	def nag(self):
+		self.delta_w = self.args.momentum * self.delta_w
+		self.delta_b = self.args.momentum * self.delta_b
+		self.update(self.delta_w, self.delta_b)
 
 	def momentum(self, grad_W, grad_b):
 
