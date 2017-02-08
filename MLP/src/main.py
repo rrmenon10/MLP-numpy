@@ -104,14 +104,17 @@ class FinalLayer():
 		elif self.args.optimizer == "adam":
 			self.adam(grad_W, grad_b)
 		elif self.args.optimizer == "nag":
-			self.gd(grad_W,grad_b)
+			self.gd(grad_W,grad_b,True)
 		elif self.args.optimizer == "momentum":
 			self.momentum(grad_W, grad_b)
 
-	def gd(self, grad_W, grad_b):
+	def gd(self, grad_W, grad_b, nag=None):
 
 		self.delta_w = self.lr*grad_W
 		self.delta_b = self.lr*grad_b
+		if nag:
+			self.v_w += self.delta_w
+			self.v_b += self.delta_b.sum(0)
 		self.update(self.delta_w, self.delta_b)
 
 	def adam(self, grad_W, grad_b):
@@ -128,9 +131,9 @@ class FinalLayer():
 		self.update(self.delta_w, self.delta_b)
 
 	def nag(self):
-		self.delta_w = self.args.momentum * self.delta_w
-		self.delta_b = self.args.momentum * self.delta_b
-		self.update(self.delta_w, self.delta_b)
+		self.v_w = self.args.momentum * self.v_w
+		self.v_b = self.args.momentum * self.v_b
+		self.update(self.v_w, self.v_b)
 
 	def momentum(self, grad_W, grad_b):
 
@@ -212,7 +215,7 @@ class HiddenLayer():
 		elif self.args.optimizer == "adam":
 			self.adam(grad_W, grad_b)
 		elif self.args.optimizer == "nag":
-			self.gd(grad_W,grad_b)
+			self.gd(grad_W,grad_b,True)
 		elif self.args.optimizer == "momentum":
 			self.momentum(grad_W, grad_b)
 
@@ -228,10 +231,13 @@ class HiddenLayer():
 	def grad_sigmoid(self):
 		return np.multiply(self.output,(1-self.output))
 
-	def gd(self, grad_W, grad_b):
+	def gd(self, grad_W, grad_b, nag=None):
 
 		self.delta_w = self.lr*grad_W
 		self.delta_b = self.lr*grad_b
+		if nag:
+			self.v_w += self.delta_w
+			self.v_b += self.delta_b.sum(0)
 		self.update(self.delta_w, self.delta_b)
 
 	def adam(self, grad_W, grad_b):
@@ -248,9 +254,9 @@ class HiddenLayer():
 		self.update(self.delta_w, self.delta_b)
 
 	def nag(self):
-		self.delta_w = self.args.momentum * self.delta_w
-		self.delta_b = self.args.momentum * self.delta_b
-		self.update(self.delta_w, self.delta_b)
+		self.v_w = self.args.momentum * self.v_w
+		self.v_b = self.args.momentum * self.v_b
+		self.update(self.v_w, self.v_b)
 
 	def momentum(self, grad_W, grad_b):
 
