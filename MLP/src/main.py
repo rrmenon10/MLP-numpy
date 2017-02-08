@@ -44,7 +44,7 @@ class FinalLayer():
 
 		if args.loss == "ce":
 			self.act = self.softmax
-		elif args.act == "sq":
+		elif args.loss == "sq":
 			self.act = self.identity
 
 		self.args = args
@@ -128,14 +128,14 @@ class FinalLayer():
 
 	def momentum(self, grad_W, grad_b):
 
-		self.delta_w = args.momentum * self.delta_w + self.lr * grad_W
-		self.delta_b = args.momentum * self.delta_b + self.lr * grad_W
+		self.delta_w = self.args.momentum * self.delta_w + self.lr * grad_W
+		self.delta_b = self.args.momentum * self.delta_b + self.lr * grad_b
 		self.update(self.delta_w, self.delta_b)
 
 	def update(self, delta_w, delta_b):
 
 		self.W -= self.delta_w
-		self.b -= self.delta_b.mean(0)
+		self.b -= self.delta_b.sum(0)
 
 class HiddenLayer():
 
@@ -172,7 +172,7 @@ class HiddenLayer():
 		self.momentum_b = np.zeros((n_output,))
 		self.v_w = np.zeros((n_input, n_output))
 		self.v_b = np.zeros((n_output,))
-		self.epsilon = 0.001
+		self.epsilon = 1e-8
 		self.beta1 = 0.9
 		self.beta2 = 0.999
 
@@ -244,14 +244,14 @@ class HiddenLayer():
 
 	def momentum(self, grad_W, grad_b):
 
-		self.delta_w = args.momentum * self.delta_w + self.lr * grad_W
-		self.delta_b = args.momentum * self.delta_b + self.lr * grad_W
+		self.delta_w = self.args.momentum * self.delta_w + self.lr * grad_W
+		self.delta_b = self.args.momentum * self.delta_b + self.lr * grad_b
 		self.update(self.delta_w, self.delta_b)
 
 	def update(self, delta_w, delta_b):
 
 		self.W -= self.delta_w
-		self.b -= self.delta_b.mean(0)
+		self.b -= self.delta_b.sum(0)
 
 
 class MLP():
@@ -454,6 +454,8 @@ class MLP():
 						best_test_loss = np.mean(test_loss)
 						best_test_steps = i
 						best_test_epoch = j
+
+					print "Epoch : %d Steps : %d Train Accuracy : %.4f Validation Accuracy : %.4f Test Accuracy : %.4f LR : %.4f"%(j, i+1, 100*(np.mean(train_loss)), 100*(np.mean(valid_loss)), 100*(np.mean(test_loss)), self.layers[-1].lr)
 
 					f11_pred.close()
 					f12_pred.close()
