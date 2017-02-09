@@ -6,6 +6,7 @@ __author__ = 'Rakesh'
 # 2. Dropouts (Manu)
 # 3. Batch-norm (Manu)
 # 4. Plots (Rakesh)
+# 5. (IMP) Check the gradient formula for squared error
 
 
 import numpy as np
@@ -76,33 +77,37 @@ class FinalLayer():
 	def identity(self, input):
 		return input
 
-	def backward_prop(self, one_hot_vec):
+	def backward_prop(self, one_hot_vec, numSteps):
 
 		if self.args.optimizer == "nag":
 			self.nag()
 			self.output = self.forward_pass(self.input)
 
 		if self.args.loss == "ce":
-			gradOutput = self.grad_calc(-(one_hot_vec - self.output)) 
+			gradOutput = self.grad_calc(-(one_hot_vec - self.output), numSteps) 
 		elif self.args.loss == "sq":
-			gradOutput = self.grad_calc((one_hot_vec - self.output))
+			gradOutput = self.grad_calc(-(one_hot_vec - self.output), numSteps)
 
 		return gradOutput
 
-	def grad_calc(self, grad_a):
+	def grad_softmax(self):
+
+		return self.output*(1-self.output)
+
+	def grad_calc(self, grad_a, numSteps):
 
 		grad_W = np.dot(self.input.T,grad_a)
 		grad_b = grad_a
 		gradInput = np.dot(grad_a,self.W.T)
-		self.updateParameters(grad_W, grad_b)
+		self.updateParameters(grad_W, grad_b, numSteps)
 		return gradInput
 
-	def updateParameters(self, grad_W, grad_b):
+	def updateParameters(self, grad_W, grad_b, numSteps):
 
 		if self.args.optimizer == "gd":
 			self.gd(grad_W, grad_b)
 		elif self.args.optimizer == "adam":
-			self.adam(grad_W, grad_b)
+			self.adam(grad_W, grad_b, numSteps)
 		elif self.args.optimizer == "nag":
 			self.gd(grad_W,grad_b,True)
 		elif self.args.optimizer == "momentum":
@@ -117,13 +122,18 @@ class FinalLayer():
 			self.v_b += self.delta_b.sum(0)
 		self.update(self.delta_w, self.delta_b)
 
-	def adam(self, grad_W, grad_b):
+	def adam(self, grad_W, grad_b, numSteps):
 
 		self.momentum_w = self.beta1 * self.momentum_w + (1-self.beta1) * grad_W
 		self.momentum_b = self.beta1 * self.momentum_b + (1-self.beta1) * grad_b
 
 		self.v_w = self.beta2 * self.v_w + (1-self.beta2) * grad_W**2
 		self.v_b = self.beta2 * self.v_b + (1-self.beta2) * grad_b**2
+
+		self.momentum_w = self.momentum_w/(1-beta1**numSteps)
+		self.momentum_b = self.momentum_b/(1-beta1**numSteps)
+		self.v_w = self.v_w/(1-beta2**numSteps)
+		self.v_b = self.v_b/(1-beta2**numSteps)
 
 		self.delta_w = self.lr/(np.sqrt(self.v_w) + self.epsilon)*self.momentum_w
 		self.delta_b = self.lr/(np.sqrt(self.v_b) + self.epsilon)*self.momentum_b
@@ -151,13 +161,22 @@ class HiddenLayer():
 	def __init__(self, rng, n_input, n_output, args, W=None, b=None):
 
 		if W==None:
-			self.W = np.array(
-						rng.uniform(
-	                    low=-np.sqrt(6. / (n_input + n_output)),
-	                    high=np.sqrt(6. / (n_input + n_output)),
-	                    size=(n_input, n_output)
-	                	)
-	                	, dtype=float)
+			if args.act=="sigmoid":
+				self.W = np.array(
+							rng.uniform(
+		                    low=-np.sqrt(6. / (n_input + n_output)),
+		                    high=np.sqrt(6. / (n_input + n_output)),
+		                    size=(n_input, n_output)
+		                	)
+		                	, dtype=float)
+			elif args.act=="tanh":
+				self.W = np.array(
+							rng.uniform(
+		                    low=-4*np.sqrt(6. / (n_input + n_output)),
+		                    high=4*np.sqrt(6. / (n_input + n_output)),
+		                    size=(n_input, n_output)
+		                	)
+		                	, dtype=float)
 		else:
 			self.W = W
 
@@ -196,7 +215,7 @@ class HiddenLayer():
 
 		return self.output
 
-	def backward_prop(self,gradOutput):
+	def backward_prop(self,gradOutput, numSteps):
 
 		if self.args.optimizer == "nag":
 			self.nag()
@@ -205,15 +224,15 @@ class HiddenLayer():
 		grad_W = np.dot(self.input.T,grad_a)
 		grad_b = grad_a
 		gradInput = np.dot(grad_a,self.W.T)
-		self.updateParameters(grad_W, grad_b)
+		self.updateParameters(grad_W, grad_b, numSteps)
 		return gradInput
 
-	def updateParameters(self, grad_W, grad_b):
+	def updateParameters(self, grad_W, grad_b, numSteps):
 
 		if self.args.optimizer == "gd":
 			self.gd(grad_W, grad_b)
 		elif self.args.optimizer == "adam":
-			self.adam(grad_W, grad_b)
+			self.adam(grad_W, grad_b, numSteps)
 		elif self.args.optimizer == "nag":
 			self.gd(grad_W,grad_b,True)
 		elif self.args.optimizer == "momentum":
@@ -240,13 +259,18 @@ class HiddenLayer():
 			self.v_b += self.delta_b.sum(0)
 		self.update(self.delta_w, self.delta_b)
 
-	def adam(self, grad_W, grad_b):
+	def adam(self, grad_W, grad_b, numSteps):
 
 		self.momentum_w = self.beta1 * self.momentum_w + (1-self.beta1) * grad_W
 		self.momentum_b = self.beta1 * self.momentum_b + (1-self.beta1) * grad_b
 
 		self.v_w = self.beta2 * self.v_w + (1-self.beta2) * grad_W**2
 		self.v_b = self.beta2 * self.v_b + (1-self.beta2) * grad_b**2
+
+		self.momentum_w = self.momentum_w/(1-beta1**numSteps)
+		self.momentum_b = self.momentum_b/(1-beta1**numSteps)
+		self.v_w = self.v_w/(1-beta2**numSteps)
+		self.v_b = self.v_b/(1-beta2**numSteps)
 
 		self.delta_w = self.lr/(np.sqrt(self.v_w) + self.epsilon)*self.momentum_w
 		self.delta_b = self.lr/(np.sqrt(self.v_b) + self.epsilon)*self.momentum_b
@@ -381,7 +405,7 @@ class MLP():
 				# #Code for backward-prop
 				gradOutput = y_onehot
 				for ii in range(len(self.layers)):
-					gradOutput = self.layers[len(self.layers)-(ii+1)].backward_prop(gradOutput)
+					gradOutput = self.layers[len(self.layers)-(ii+1)].backward_prop(gradOutput, (i+1))
 
 				if (i+1)%100==0:
 
